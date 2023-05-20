@@ -1,8 +1,7 @@
-# openai-langchain-csvagent
+# OpenAI-Langchain CSV Agent Interaction
 OpenAI-Langchain implementation of CSV Agent for Data Analysis
 
 
-# OpenAI-Langchain CSV Agent Interaction
 
 This Streamlit application facilitates interactive communication with a CSV Agent empowered by the state-of-the-art OpenAI API. The CSV Agent employs the cutting-edge OpenAI GPT-3.5 language model to respond intelligently and comprehensively to user queries based on the content of a CSV file.
 
