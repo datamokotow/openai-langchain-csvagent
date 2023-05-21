@@ -7,7 +7,7 @@ This Streamlit application facilitates interactive communication with a CSV Agen
 
 ## Architecture
 
-This meticulously crafted application harnesses a well-engineered architecture, comprising the following key components:
+This application harnesses a well-engineered architecture, comprising the following key components:
 
 - **OpenAI GPT-3.5 Language Model**: The CSV Agent capitalizes on the remarkable capabilities of the OpenAI GPT-3.5 language model. This advanced language model has been meticulously trained on diverse text sources, enabling it to generate highly informative and contextually-aware responses. It possesses the ability to understand complex queries and generate coherent and insightful answers.
 
