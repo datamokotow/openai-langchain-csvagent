@@ -2,3 +2,6 @@ streamlit
 langchain
 openai
 streamlit-chat
+python-environ
+json
+pandas
