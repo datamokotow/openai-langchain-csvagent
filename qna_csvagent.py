@@ -1,161 +1,135 @@
+import os
+import tempfile
 import streamlit as st
-import pandas as pd
-import json
+from streamlit_chat import message
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
 
-from langchain import OpenAI
-from langchain.agents import create_pandas_dataframe_agent
-import pandas as pd
-
-# Setting up the api key
-import environ
-
-env = environ.Env()
-environ.Env.read_env()
-
-OPENAI_API_KEY = env("OPENAI_API_KEY")
+from langchain.chains import ConversationalRetrievalChain
+from langchain.llms import OpenAI
 
 
-def create_agent(filename: str):
-    """
-    Create an agent that can access and use a large language model (LLM).
+class Agent:
+    def __init__(self, openai_api_key: str | None = None) -> None:
+        # if openai_api_key is None, then it will look the enviroment variable OPENAI_API_KEY
+        self.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
-    Args:
-        filename: The path to the CSV file that contains the data.
+        self.llm = OpenAI(temperature=0, openai_api_key=openai_api_key)
 
-    Returns:
-        An agent that can access and use the LLM.
-    """
+        self.chat_history = None
+        self.chain = None
+        self.db = None
 
-    # Create an OpenAI object.
-    llm = OpenAI(openai_api_key=OPENAI_API_KEY)
+    def ask(self, question: str) -> str:
+        if self.chain is None:
+            response = "Please, add a document."
+        else:
+            response = self.chain({"question": question, "chat_history": self.chat_history})
+            response = response["answer"].strip()
+            self.chat_history.append((question, response))
+        return response
 
-    # Read the CSV file into a Pandas DataFrame.
-    df = pd.read_csv(filename)
+    def ingest(self, file_path: os.PathLike) -> None:
+        loader = PyPDFLoader(file_path)
+        documents = loader.load()
+        splitted_documents = self.text_splitter.split_documents(documents)
 
-    # Create a Pandas DataFrame agent.
-    return create_pandas_dataframe_agent(llm, df, verbose=False)
+        if self.db is None:
+            self.db = FAISS.from_documents(splitted_documents, self.embeddings)
+            self.chain = ConversationalRetrievalChain.from_llm(self.llm, self.db.as_retriever())
+            self.chat_history = []
+        else:
+            self.db.add_documents(splitted_documents)
+
+    def forget(self) -> None:
+        self.db = None
+        self.chain = None
+        self.chat_history = None
+
+st.set_page_config(page_title="ChatPDF")
 
 
-def query_agent(agent, query):
-    """
-    Query an agent and return the response as a string.
+def display_messages():
+    st.subheader("Chat")
+    for i, (msg, is_user) in enumerate(st.session_state["messages"]):
+        message(msg, is_user=is_user, key=str(i))
+    st.session_state["thinking_spinner"] = st.empty()
 
-    Args:
-        agent: The agent to query.
-        query: The query to ask the agent.
 
-    Returns:
-        The response from the agent as a string.
-    """
+def process_input():
+    if st.session_state["user_input"] and len(st.session_state["user_input"].strip()) > 0:
+        user_text = st.session_state["user_input"].strip()
+        with st.session_state["thinking_spinner"], st.spinner(f"Thinking"):
+            agent_text = st.session_state["agent"].ask(user_text)
 
-    prompt = (
-        """
-            For the following query, if it requires drawing a table, reply as follows:
-            {"table": {"columns": ["column1", "column2", ...], "data": [[value1, value2, ...], [value1, value2, ...], ...]}}
+        st.session_state["messages"].append((user_text, True))
+        st.session_state["messages"].append((agent_text, False))
 
-            If the query requires creating a bar chart, reply as follows:
-            {"bar": {"columns": ["A", "B", "C", ...], "data": [25, 24, 10, ...]}}
-            
-            If the query requires creating a line chart, reply as follows:
-            {"line": {"columns": ["A", "B", "C", ...], "data": [25, 24, 10, ...]}}
-            
-            There can only be two types of chart, "bar" and "line".
-            
-            If it is just asking a question that requires neither, reply as follows:
-            {"answer": "answer"}
-            Example:
-            {"answer": "The title with the highest rating is 'Gilead'"}
-            
-            If you do not know the answer, reply as follows:
-            {"answer": "I do not know."}
-            
-            Return all output as a string.
-            
-            All strings in "columns" list and data list, should be in double quotes,
-            
-            For example: {"columns": ["title", "ratings_count"], "data": [["Gilead", 361], ["Spider's Web", 5164]]}
-            
-            Lets think step by step.
-            
-            Below is the query.
-            Query: 
-            """
-        + query
+
+def read_and_save_file():
+    st.session_state["agent"].forget()  # to reset the knowledge base
+    st.session_state["messages"] = []
+    st.session_state["user_input"] = ""
+
+    for file in st.session_state["file_uploader"]:
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            tf.write(file.getbuffer())
+            file_path = tf.name
+
+        with st.session_state["ingestion_spinner"], st.spinner(f"Ingesting {file.name}"):
+            st.session_state["agent"].ingest(file_path)
+        os.remove(file_path)
+
+
+def is_openai_api_key_set() -> bool:
+    return len(st.session_state["OPENAI_API_KEY"]) > 0
+
+
+def main():
+    if len(st.session_state) == 0:
+        st.session_state["messages"] = []
+        st.session_state["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
+        if is_openai_api_key_set():
+            st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
+        else:
+            st.session_state["agent"] = None
+
+    st.header("ChatPDF")
+
+    if st.text_input("OpenAI API Key", value=st.session_state["OPENAI_API_KEY"], key="input_OPENAI_API_KEY", type="password"):
+        if (
+            len(st.session_state["input_OPENAI_API_KEY"]) > 0
+            and st.session_state["input_OPENAI_API_KEY"] != st.session_state["OPENAI_API_KEY"]
+        ):
+            st.session_state["OPENAI_API_KEY"] = st.session_state["input_OPENAI_API_KEY"]
+            if st.session_state["agent"] is not None:
+                st.warning("Please, upload the files again.")
+            st.session_state["messages"] = []
+            st.session_state["user_input"] = ""
+            st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
+
+    st.subheader("Upload a document")
+    st.file_uploader(
+        "Upload document",
+        type=["pdf"],
+        key="file_uploader",
+        on_change=read_and_save_file,
+        label_visibility="collapsed",
+        accept_multiple_files=True,
+        disabled=not is_openai_api_key_set(),
     )
 
-    # Run the prompt through the agent.
-    response = agent.run(prompt)
+    st.session_state["ingestion_spinner"] = st.empty()
 
-    # Convert the response to a string.
-    return response.__str__()
+    display_messages()
+    st.text_input("Message", key="user_input", disabled=not is_openai_api_key_set(), on_change=process_input)
 
-
-
-def decode_response(response: str) -> dict:
-    """This function converts the string response from the model to a dictionary object.
-
-    Args:
-        response (str): response from the model
-
-    Returns:
-        dict: dictionary with response data
-    """
-    return json.loads(response)
+    st.divider()
+    st.markdown("Source code: [Github](https://github.com/viniciusarruda/chatpdf)")
 
 
-def write_response(response_dict: dict):
-    """
-    Write a response from an agent to a Streamlit app.
-
-    Args:
-        response_dict: The response from the agent.
-
-    Returns:
-        None.
-    """
-
-    # Check if the response is an answer.
-    if "answer" in response_dict:
-        st.write(response_dict["answer"])
-
-    # Check if the response is a bar chart.
-    if "bar" in response_dict:
-        data = response_dict["bar"]
-        df = pd.DataFrame(data)
-        df.set_index("columns", inplace=True)
-        st.bar_chart(df)
-
-    # Check if the response is a line chart.
-    if "line" in response_dict:
-        data = response_dict["line"]
-        df = pd.DataFrame(data)
-        df.set_index("columns", inplace=True)
-        st.line_chart(df)
-
-    # Check if the response is a table.
-    if "table" in response_dict:
-        data = response_dict["table"]
-        df = pd.DataFrame(data["data"], columns=data["columns"])
-        st.table(df)
-
-
-st.title("👨‍💻 Chat with your CSV")
-
-st.write("Please upload your CSV file below.")
-
-data = st.file_uploader("Upload a CSV")
-
-query = st.text_area("Insert your query")
-
-if st.button("Submit Query", type="primary"):
-    # Create an agent from the CSV file.
-    agent = create_agent(data)
-
-    # Query the agent.
-    response = query_agent(agent=agent, query=query)
-
-    # Decode the response.
-    decoded_response = decode_response(response)
-
-    # Write the response to the Streamlit app.
-    write_response(decoded_response)
+if __name__ == "__main__":
+    main()
