@@ -1,68 +1,34 @@
-# OpenAI-Langchain CSV Agent Interaction
-OpenAI-Langchain implementation of CSV Agent for Data Analysis
+## Personalized Bot with Memory: A Document Understanding AI
 
-Streamlit App > https://datamokotow-openai-langchain-csvagent-qna-csvagent-9a1rpx.streamlit.app/
+Streamlit App -- https://datamokotow-openai-langchain-pdfchat-pdfchat-4pc5mv.streamlit.app/
 
-This Streamlit application facilitates interactive communication with a CSV Agent empowered by the state-of-the-art OpenAI API. The CSV Agent employs the cutting-edge OpenAI GPT-3.5 language model to respond intelligently and comprehensively to user queries based on the content of a CSV file.
+**Description**
+This repository contains a powerful application that demonstrates a personalized Conversational AI bot which can parse, understand, and answer questions from an uploaded PDF document. The bot uses OpenAI's GPT-3 model for natural language understanding and generation, LangChain for linguistic processing, FAISS for efficient similarity search, and Streamlit for user-friendly interactive UI.
 
-## Architecture
+**Technical Overview**
+The primary components of the bot are:
 
-This application harnesses a well-engineered architecture, comprising the following key components:
+PDF Parser: This component uses the PyPDF library to extract text from an uploaded PDF document. The extracted text is then chunked into manageable parts, which are treated as distinct documents, with appropriate metadata like page numbers and chunk identifiers.
 
-- **OpenAI GPT-3.5 Language Model**: The CSV Agent capitalizes on the remarkable capabilities of the OpenAI GPT-3.5 language model. This advanced language model has been trained on diverse text sources, enabling it to generate highly informative and contextually-aware responses. It possesses the ability to understand complex queries and generate coherent and insightful answers.
+OpenAI GPT-3 Model: GPT-3 model is utilized for language understanding and generation tasks. The OpenAI API key is required to access this service.
 
-- **Streamlit**: The user interface of this application is constructed using Streamlit, a Python library renowned for its simplicity and versatility in building web applications. Streamlit empowers users to seamlessly interact with the CSV Agent, providing an intuitive experience.
+Embeddings and Similarity Search: After the text extraction and chunking process, the documents are transformed into vector embeddings using the OpenAI Embeddings, which are then indexed using a FAISS (Facebook AI Similarity Search) index for efficient similarity search.
 
-- **langchain**: The sophisticated langchain library serves as the backbone for the CSV Agent's implementation. This purpose-built library offers a comprehensive suite of functions and classes, specifically designed for developing conversational agents. With langchain, creating agents capable of processing user inputs and generating tailored and contextually-appropriate responses becomes effortless.
+Question-Answering System: The RetrievalQA system is set up using the indexed embeddings. The system uses a retriever-ranker architecture for extracting the most relevant chunks of text in response to a query.
 
-## Getting Started
+Conversational Agent: The conversational agent uses a zero-shot learning approach, using a series of tools including the QA system, to maintain a conversation with the user. The agent uses a Conversation Buffer Memory to store the conversation history, providing context for subsequent questions and responses.
 
-To commence your journey with this powerful application, kindly follow these steps:
+Streamlit UI: Streamlit is used to create an interactive web application where users can upload their PDF documents, input their queries, and receive responses from the AI agent.
 
-1. Clone the repository:
+**Usage**
+To use this application, clone this repository and run the Streamlit app. The user interface will guide you through the process of uploading a PDF file, entering your OpenAI API key, and starting your interaction with the bot.
 
-   ```bash
-   git clone https://github.com/your-username/your-repository.git
-   ```
+**Contributions**
+Contributions to enhance this bot are welcomed. Please feel free to submit pull requests or raise issues.
 
-2. Install the dependencies:
+**License**
+This project is licensed under the terms of the MIT license.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
 
-3. Set up the OpenAI API key:
 
-   - Register for an OpenAI account and acquire an API key.
-   - Seamlessly integrate your API key into the Streamlit application by following the accompanying instructions.
 
-4. Run the application:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-5. Open the application in your preferred web browser:
-
-   ```
-   http://localhost:8501
-   ```
-
-## Usage ( I have generated this part using by giving code to chatGPT eith higher temperature value and asking for a usage section. You may find the language more creative.)
-
-1. Begin your interaction by uploading a CSV file. Delicately select the "Upload a CSV file" button thoughtfully positioned in the sidebar. Kindly note that only CSV files are accepted as valid input.
-
-2. Once the CSV file is successfully uploaded, embark on a journey of inquiry, posing thought-provoking questions related to the CSV data.
-
-3. Articulate your question elegantly within the "Enter your question" text input field. Subsequently, press Enter to unveil the CSV Agent's profound understanding of the data.
-
-4. The CSV Agent deftly processes your question using the OpenAI GPT-3.5 language model's expansive knowledge, deftly generating an astute and personalized response based on the underlying CSV data.
-
-5. The conversation history adroitly unfolds before your eyes, presented in an immersive chat-like format. Each interaction between yourself and the CSV Agent is meticulously captured, enabling a coherent and insightful narrative.
-
-## Follow Me
-
-- [Twitter](https://twitter.com/datamokotow)
-- [GitHub](https://github.com/datamokotow)
-
----
