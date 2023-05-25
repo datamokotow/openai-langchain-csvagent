@@ -1,7 +1,7 @@
 streamlit
+streamlit_chat
 langchain
 openai
-streamlit-chat
-python-environ
-simplejson
-pandas
+faiss-cpu
+pypdf
+tiktoken
