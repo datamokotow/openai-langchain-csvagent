@@ -3,5 +3,5 @@ langchain
 openai
 streamlit-chat
 python-environ
-json
+simplejson
 pandas
