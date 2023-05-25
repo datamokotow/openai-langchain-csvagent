@@ -1,90 +1,121 @@
+from PyPDF2 import PdfReader
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.chains.question_answering import load_qa_chain
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain
+import pickle
+from pathlib import Path
+from dotenv import load_dotenv
 import os
-import tempfile
 import streamlit as st
 from streamlit_chat import message
-from agent import Agent
+import io
+import asyncio
 
-st.set_page_config(page_title="ChatPDF")
+load_dotenv()
+api_key = os.getenv('OPENAI_API_KEY')  
+
+# vectors = getDocEmbeds("gpt4.pdf")
+# qa = ChatVectorDBChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"), vectors, return_source_documents=True)
+
+async def main():
+
+    async def storeDocEmbeds(file, filename):
+    
+        reader = PdfReader(file)
+        corpus = ''.join([p.extract_text() for p in reader.pages if p.extract_text()])
+        
+        splitter =  RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200,)
+        chunks = splitter.split_text(corpus)
+        
+        embeddings = OpenAIEmbeddings(openai_api_key = api_key)
+        vectors = FAISS.from_texts(chunks, embeddings)
+        
+        with open(filename + ".pkl", "wb") as f:
+            pickle.dump(vectors, f)
+
+        
+    async def getDocEmbeds(file, filename):
+        
+        if not os.path.isfile(filename + ".pkl"):
+            await storeDocEmbeds(file, filename)
+        
+        with open(filename + ".pkl", "rb") as f:
+            global vectores
+            vectors = pickle.load(f)
+            
+        return vectors
+    
+
+    async def conversational_chat(query):
+        result = qa({"question": query, "chat_history": st.session_state['history']})
+        st.session_state['history'].append((query, result["answer"]))
+        # print("Log: ")
+        # print(st.session_state['history'])
+        return result["answer"]
 
 
-def display_messages():
-    st.subheader("Chat")
-    for i, (msg, is_user) in enumerate(st.session_state["messages"]):
-        message(msg, is_user=is_user, key=str(i))
-    st.session_state["thinking_spinner"] = st.empty()
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+    chain = load_qa_chain(llm, chain_type="stuff")
+
+    if 'history' not in st.session_state:
+        st.session_state['history'] = []
 
 
-def process_input():
-    if st.session_state["user_input"] and len(st.session_state["user_input"].strip()) > 0:
-        user_text = st.session_state["user_input"].strip()
-        with st.session_state["thinking_spinner"], st.spinner(f"Thinking"):
-            agent_text = st.session_state["agent"].ask(user_text)
+    #Creating the chatbot interface
+    st.title("PDFChat :")
 
-        st.session_state["messages"].append((user_text, True))
-        st.session_state["messages"].append((agent_text, False))
+    if 'ready' not in st.session_state:
+        st.session_state['ready'] = False
 
+    uploaded_file = st.file_uploader("Choose a file", type="pdf")
 
-def read_and_save_file():
-    st.session_state["agent"].forget()  # to reset the knowledge base
-    st.session_state["messages"] = []
-    st.session_state["user_input"] = ""
+    if uploaded_file is not None:
 
-    for file in st.session_state["file_uploader"]:
-        with tempfile.NamedTemporaryFile(delete=False) as tf:
-            tf.write(file.getbuffer())
-            file_path = tf.name
+        with st.spinner("Processing..."):
+        # Add your code here that needs to be executed
+            uploaded_file.seek(0)
+            file = uploaded_file.read()
+            # pdf = PyPDF2.PdfFileReader()
+            vectors = await getDocEmbeds(io.BytesIO(file), uploaded_file.name)
+            qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"), retriever=vectors.as_retriever(), return_source_documents=True)
 
-        with st.session_state["ingestion_spinner"], st.spinner(f"Ingesting {file.name}"):
-            st.session_state["agent"].ingest(file_path)
-        os.remove(file_path)
-
-
-def is_openai_api_key_set() -> bool:
-    return len(st.session_state["OPENAI_API_KEY"]) > 0
-
-
-def main():
-    if len(st.session_state) == 0:
-        st.session_state["messages"] = []
-        st.session_state["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
-        if is_openai_api_key_set():
-            st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
-        else:
-            st.session_state["agent"] = None
-
-    st.header("ChatPDF")
-
-    if st.text_input("OpenAI API Key", value=st.session_state["OPENAI_API_KEY"], key="input_OPENAI_API_KEY", type="password"):
-        if (
-            len(st.session_state["input_OPENAI_API_KEY"]) > 0
-            and st.session_state["input_OPENAI_API_KEY"] != st.session_state["OPENAI_API_KEY"]
-        ):
-            st.session_state["OPENAI_API_KEY"] = st.session_state["input_OPENAI_API_KEY"]
-            if st.session_state["agent"] is not None:
-                st.warning("Please, upload the files again.")
-            st.session_state["messages"] = []
-            st.session_state["user_input"] = ""
-            st.session_state["agent"] = Agent(st.session_state["OPENAI_API_KEY"])
-
-    st.subheader("Upload a document")
-    st.file_uploader(
-        "Upload document",
-        type=["pdf"],
-        key="file_uploader",
-        on_change=read_and_save_file,
-        label_visibility="collapsed",
-        accept_multiple_files=True,
-        disabled=not is_openai_api_key_set(),
-    )
-
-    st.session_state["ingestion_spinner"] = st.empty()
-
-    display_messages()
-    st.text_input("Message", key="user_input", disabled=not is_openai_api_key_set(), on_change=process_input)
+        st.session_state['ready'] = True
 
     st.divider()
-    st.markdown("Source code: [Github](https://github.com/viniciusarruda/chatpdf)")
+
+    if st.session_state['ready']:
+
+        if 'generated' not in st.session_state:
+            st.session_state['generated'] = ["Welcome! You can now ask any questions regarding " + uploaded_file.name]
+
+        if 'past' not in st.session_state:
+            st.session_state['past'] = ["Hey!"]
+
+        # container for chat history
+        response_container = st.container()
+
+        # container for text box
+        container = st.container()
+
+        with container:
+            with st.form(key='my_form', clear_on_submit=True):
+                user_input = st.text_input("Query:", placeholder="e.g: Summarize the paper in a few sentences", key='input')
+                submit_button = st.form_submit_button(label='Send')
+
+            if submit_button and user_input:
+                output = await conversational_chat(user_input)
+                st.session_state['past'].append(user_input)
+                st.session_state['generated'].append(output)
+
+        if st.session_state['generated']:
+            with response_container:
+                for i in range(len(st.session_state['generated'])):
+                    message(st.session_state["past"][i], is_user=True, key=str(i) + '_user', avatar_style="thumbs")
+                    message(st.session_state["generated"][i], key=str(i), avatar_style="fun-emoji")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
