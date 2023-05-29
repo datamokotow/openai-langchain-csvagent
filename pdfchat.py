@@ -88,10 +88,7 @@ def test_embed():
 st.title("🤖 Personalized Bot with Memory 🧠 ")
 st.markdown(
     """ 
-        ####  🗨️ Chat with your PDF files 📜 with `Conversational Buffer Memory`  
-        > *powered by [LangChain]('https://langchain.readthedocs.io/en/latest/modules/memory.html#memory') + 
-        [OpenAI]('https://platform.openai.com/docs/models/gpt-3-5') + [DataButton](https://www.databutton.io/)*
-        ----
+        ####  🗨️ Chat with your PDF files 📜 | includes `Conversational Buffer Memory`  
         """
 )
 
@@ -114,8 +111,6 @@ st.sidebar.markdown(
     1. Upload PDF File
     2. Enter Your Secret Key for Embeddings
     3. Perform Q&A
-
-    **Note : File content and API key not stored in any form.**
     """
 )
 
