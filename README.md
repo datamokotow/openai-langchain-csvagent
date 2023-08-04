@@ -3,7 +3,7 @@
 Streamlit App -- https://datamokotow-openai-langchain-pdfchat-pdfchat-4pc5mv.streamlit.app/
 
 **Description**
-This repository contains a powerful application that demonstrates a personalized Conversational AI bot which can parse, understand, and answer questions from an uploaded PDF document. The bot uses OpenAI's GPT-3 model for natural language understanding and generation, LangChain for linguistic processing, FAISS for efficient similarity search, and Streamlit for user-friendly interactive UI.
+This repository contains a powerful application that demonstrates a personalized Conversational AI bot which can parse, understand, and answer questions from an uploaded PDF document. The bot uses OpenAI's GPT-3 model for natural language understanding and generation, LangChain for linguistic processing, FAISS for efficient similarity search and Streamlit for user-friendly interactive UI.
 
 **Technical Overview**
 The primary components of the bot are:
